@@ -14,6 +14,6 @@
     "typescript": "^4.1.2"
   },
   "dependencies": {
-    "ts-hashconsing": "link:../experimental/ts-hashconsing"
+    "ts-hashconsing": "github:seagull-kamome/ts-hashconsing"
   }
 }

@@ -48,7 +48,6 @@ export type Expr
   | { kind: 'app', fn:HC<Expr>, params:HC<Expr>[] }
   | { kind: 'fld', obj:HC<Expr>, fld:HC<Field> }
   | { kind: '[]', obj:HC<Expr>, idx:HC<Expr> }
-  | CVarRef
   | VarRef ;
 
 export type Block = { kind: 'block', bdy:HC<Statement>[] };
@@ -62,10 +61,11 @@ export type Statement
   | Decl ;
 
 
-export type CVarRef = { kind: 'const', name:string };
-export type VarRef = { kind: 'let', name:string };
+export type VarRef
+  = { kind: 'let', name:string }
+  | { kind: 'const', name:string };
 export type Decl
-  = { kind: 'vardecl', exposed:boolean, varref:HC<VarRef>|HC<CVarRef>, init:HC<Expr>|null } ;
+  = { kind: 'vardecl', exposed:boolean, varref:HC<VarRef>, init:HC<Expr>|null } ;
 
 
 /* ************************************************************************ */
@@ -77,7 +77,7 @@ const fromAnyExpr = (x:anyExpr):HC<Expr> => {
 
 
 export const varRef = (name:string):HC<VarRef> => intern({ kind:'let', name: name});
-export const constVar = (name:string):HC<CVarRef> => intern({ kind:'const', name: name});
+export const constVar = (name:string):HC<VarRef> => intern({ kind:'const', name: name});
 export const lit = (v:undefined|null|string|number):HC<Expr> => intern({ kind:'lit', val:v });
 export const fldref = (obj:anyExpr, name:string):HC<Expr> =>
   intern({ kind:'fld', obj:fromAnyExpr(obj), fld:intern({ name: name }) });
@@ -96,7 +96,7 @@ export const mkDecl = (varref:HC<VarRef>, init:HC<Expr>|null, expose:boolean=fal
   intern({ kind:'vardecl', exposed:expose, varref:varref, init:init });
 export const mkExport = (varref:HC<VarRef>, init:HC<Expr>|null):HC<Decl> => mkDecl(varref, init, true);
 
-export const If = (cond:HC<Expr>, t:HC<Statement>, f:HC<Statement>):HC<Statement> =>
+export const If = (cond:HC<Expr>, t:HC<Statement>, f:HC<Statement>|null):HC<Statement> =>
   intern({ kind:'if', cond:cond, bdy:t, f:f });
 export const Return = (v:anyExpr):HC<Statement> => intern({ kind: 'return', val:fromAnyExpr(v) });
 
@@ -126,7 +126,7 @@ export class Module {
 
   render(f:(s:string) => void): void {
     let indentLevel = 0;
-    const indent = (x = '') => f('\n' + ' '.repeat(SW * indentLevel) + x);
+    const indent = (x:string = '') => f('\n' + ' '.repeat(SW * indentLevel) + x);
 
     function renderStatement(stmt:Statement):void {
       switch (stmt.kind) {
@@ -136,7 +136,7 @@ export class Module {
           --indentLevel;
           return indent('}');
         case 'if': case 'while':
-          indent(stmt.kind + ' '); renderExpr(stmt.cond, oprn(99), 'l');
+          f(stmt.kind + ' '); renderExpr(stmt.cond, oprn(99), 'l'); f(' ');
           renderStatement(stmt.bdy);
           if (stmt.kind === 'if' && stmt.f !== null) {
             indent('else');
@@ -144,20 +144,20 @@ export class Module {
           }
           return ;
         case 'do-while':
-          indent('do {'); ++indentLevel; renderStatement(stmt.bdy); --indentLevel;
-          indent('} while ');
-          return renderExpr(stmt.cond, oprn(99), 'l');
-        case 'return':
-          indent(stmt.kind + ' ');
-          return renderExpr(stmt.val, oprn(0), 'l'); f(';');
+          f('do ');
+          renderStatement(
+            (stmt.bdy.kind === 'block')? stmt.bdy : { kind:'block', bdy:[stmt.bdy] });
+          indent(' while ');
+          renderExpr(stmt.cond, oprn(99), 'l');
+          break;
+        case 'return': f(stmt.kind + ' '); renderExpr(stmt.val, oprn(0), 'l'); break;
         case 'vardecl':
-          indent();
           f((stmt.exposed? 'export ':'') + stmt.varref.kind + ' ' + stmt.varref.name);
           if (stmt.init !== null) { f(' = '); renderExpr(stmt.init, oprr(3), 'r'); }
-          return f(';');
-
-        default: indent(''); return renderExpr(stmt, oprn(0), 'l'); f(';');
+          break;
+        default: renderExpr(stmt, oprn(0), 'l'); break;
       }
+      return f(';');
     }
 
 
@@ -228,9 +228,9 @@ export class Module {
 
     f('// ' + this.name);
     this.imports.forEach(x => {
-      indent(); f('import * as ' + x.alias + ' from ' + x.modpath + ';'); });
+      f('\nimport * as ' + x.alias + ' from \'' + x.modpath + '\';'); });
     f('\n');
-    this.block.bdy.forEach(renderStatement);
+    this.block.bdy.forEach(x => { indent(); renderStatement(x); });
     f('\n// EOF\n');
   }
 };
