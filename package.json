@@ -1,0 +1,19 @@
+{
+  "name": "fc-lang",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "npx tsc --build"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^14.14.12",
+    "typescript": "^4.1.2"
+  },
+  "dependencies": {
+    "ts-hashconsing": "link:../experimental/ts-hashconsing"
+  }
+}
